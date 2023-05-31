@@ -1,9 +1,22 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 enum TableStatus { idle, loading, ready, error }
+
+class ConnectionService {
+  Future<bool> isConected() async {
+    try {
+      final result = await InternetAddress.lookup('google.com');
+
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } on SocketException catch (_) {
+      return false;
+    }
+  }
+}
 
 class DataService {
   final ValueNotifier<Map<String, dynamic>> tableStateNotifier = ValueNotifier({
@@ -12,13 +25,24 @@ class DataService {
     'columnNames': [], // Adicione esta linha
   });
 
-  void carregar(index) {
+  Future<void> carregar(index) async {
     final funcoes = [carregarCafes, carregarCervejas, carregarNacoes];
 
     tableStateNotifier.value = {
       'status': TableStatus.loading,
       'dataObjects': []
     };
+
+    bool isConected = await ConnectionService().isConected();
+
+    if (!isConected) {
+      tableStateNotifier.value = {
+        'status': TableStatus.error,
+        'dataObjects': []
+      };
+
+      return;
+    }
 
     funcoes[index]();
   }
@@ -150,7 +174,7 @@ class MyApp extends StatelessWidget {
                     );
 
                   case TableStatus.error:
-                    return const Text("Lascou");
+                    return const ErrorScreen();
                 }
 
                 return const Text("...");
@@ -164,8 +188,8 @@ class MyApp extends StatelessWidget {
 class NewNavBar extends HookWidget {
   final _itemSelectedCallback;
 
-  NewNavBar({itemSelectedCallback})
-      : _itemSelectedCallback = itemSelectedCallback ?? (int) {}
+  const NewNavBar({itemSelectedCallback})
+      : _itemSelectedCallback = itemSelectedCallback ?? (int);
 
   @override
   Widget build(BuildContext context) {
@@ -188,6 +212,17 @@ class NewNavBar extends HookWidget {
           BottomNavigationBarItem(
               label: "Nações", icon: Icon(Icons.flag_outlined))
         ]);
+  }
+}
+
+class ErrorScreen extends StatelessWidget {
+  const ErrorScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text("Sem conexão com internet"),
+    );
   }
 }
 
